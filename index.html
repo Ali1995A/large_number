@@ -54,6 +54,10 @@
         <button class="btn icon" id="prevBtn" type="button" aria-label="上一张">
           <span aria-hidden="true">◀</span>
         </button>
+        <button class="btn mic" id="micBtn" type="button" aria-label="按住说话（提问）">
+          <span class="micIcon" aria-hidden="true">🎤</span>
+          <span class="micText" aria-hidden="true">按住说话</span>
+        </button>
         <button class="btn wand" id="wandBtn" type="button" aria-label="魔法棒（点一下读音，长按变大）">
           <span class="wandStick" aria-hidden="true"></span>
           <span class="wandStar" aria-hidden="true"></span>
@@ -65,6 +69,11 @@
           <span id="soundIcon" aria-hidden="true">🔊</span>
         </button>
       </footer>
+
+      <div class="chat" id="chat" aria-live="polite">
+        <div class="bubble user" id="userBubble" hidden></div>
+        <div class="bubble bot" id="botBubble" hidden></div>
+      </div>
 
       <div class="hint" id="hint" aria-hidden="true">
         左右滑动换数字 · 点魔法棒听读音 · 长按魔法棒变更大 · 双指捏合缩放糖果

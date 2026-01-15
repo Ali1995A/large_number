@@ -75,6 +75,10 @@
   const containerRow = $("containerRow");
   const candyField = $("candyField");
   const hint = $("hint");
+  const micBtn = $("micBtn");
+  const chat = $("chat");
+  const userBubble = $("userBubble");
+  const botBubble = $("botBubble");
   const prevBtn = $("prevBtn");
   const nextBtn = $("nextBtn");
   const wandBtn = $("wandBtn");
@@ -87,6 +91,7 @@
   let audioEl = null;
   let audioObjectUrl = null;
   let ttsAbort = null;
+  let busy = false;
 
   const pointers = new Map();
   let pinchStartDistance = null;
@@ -375,6 +380,26 @@
     if (speakNow) speak(`${L.cn}颗糖`);
   }
 
+  function setLevelByValue(value) {
+    let idx = LEVELS.findIndex((l) => l.value === value);
+    if (idx === -1) {
+      // pick nearest
+      let best = 0;
+      let bestDist = Infinity;
+      for (let i = 0; i < LEVELS.length; i++) {
+        const d = Math.abs(LEVELS[i].value - value);
+        if (d < bestDist) {
+          bestDist = d;
+          best = i;
+        }
+      }
+      idx = best;
+    }
+    levelIndex = idx;
+    updateUI({ speakNow: false });
+    return true;
+  }
+
   function clamp(n, min, max) {
     return Math.max(min, Math.min(max, n));
   }
@@ -514,6 +539,269 @@
   world.addEventListener("pointermove", onPointerMove);
   world.addEventListener("pointerup", onPointerUp);
   world.addEventListener("pointercancel", onPointerUp);
+
+  function showBubble(el, text) {
+    if (!el) return;
+    el.textContent = text;
+    el.hidden = !text;
+    if (text) hideHintOnce();
+  }
+
+  function clearBubblesSoon() {
+    setTimeout(() => {
+      if (busy) return;
+      if (userBubble) userBubble.hidden = true;
+      if (botBubble) botBubble.hidden = true;
+    }, 8000);
+  }
+
+  async function callAsr(wavBase64) {
+    const res = await fetch("./api/asr", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        wav_base64: wavBase64,
+        model: "glm-asr-2512",
+        hotwords: ["万", "亿", "万亿", "十万", "百万", "千万", "十亿", "一百亿", "一千亿"],
+      }),
+    });
+    if (!res.ok) throw new Error(`ASR failed (${res.status})`);
+    const data = await res.json();
+    return typeof data.text === "string" ? data.text : "";
+  }
+
+  async function callBrain(transcript) {
+    const res = await fetch("./api/brain", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        transcript,
+        state: {
+          levelValue: LEVELS[levelIndex].value,
+          cn: LEVELS[levelIndex].cn,
+          unit: LEVELS[levelIndex].unit,
+          zoom,
+        },
+      }),
+    });
+    if (!res.ok) throw new Error(`Brain failed (${res.status})`);
+    return await res.json();
+  }
+
+  function applyActions(actions) {
+    if (!Array.isArray(actions)) return;
+    for (const a of actions) {
+      if (!a || typeof a !== "object") continue;
+      if (a.type === "sparkle") {
+        sparkle();
+        continue;
+      }
+      if (a.type === "setZoom") {
+        const z = Number(a.value);
+        if (Number.isFinite(z)) {
+          zoom = clamp(z, 0.8, 1.35);
+          applyZoom();
+        }
+        continue;
+      }
+      if (a.type === "showLevel") {
+        const v = Number(a.value);
+        if (Number.isFinite(v)) setLevelByValue(v);
+        continue;
+      }
+    }
+  }
+
+  // --- Mic recording (WAV) ---
+  function floatTo16BitPCM(float32) {
+    const out = new Int16Array(float32.length);
+    for (let i = 0; i < float32.length; i++) {
+      const s = Math.max(-1, Math.min(1, float32[i]));
+      out[i] = s < 0 ? s * 0x8000 : s * 0x7fff;
+    }
+    return out;
+  }
+
+  function encodeWav(int16, sampleRate) {
+    const buffer = new ArrayBuffer(44 + int16.length * 2);
+    const view = new DataView(buffer);
+    let offset = 0;
+    const writeStr = (s) => {
+      for (let i = 0; i < s.length; i++) view.setUint8(offset++, s.charCodeAt(i));
+    };
+    writeStr("RIFF");
+    view.setUint32(offset, 36 + int16.length * 2, true);
+    offset += 4;
+    writeStr("WAVE");
+    writeStr("fmt ");
+    view.setUint32(offset, 16, true);
+    offset += 4;
+    view.setUint16(offset, 1, true);
+    offset += 2;
+    view.setUint16(offset, 1, true);
+    offset += 2;
+    view.setUint32(offset, sampleRate, true);
+    offset += 4;
+    view.setUint32(offset, sampleRate * 2, true);
+    offset += 4;
+    view.setUint16(offset, 2, true);
+    offset += 2;
+    view.setUint16(offset, 16, true);
+    offset += 2;
+    writeStr("data");
+    view.setUint32(offset, int16.length * 2, true);
+    offset += 4;
+    for (let i = 0; i < int16.length; i++, offset += 2) view.setInt16(offset, int16[i], true);
+    return buffer;
+  }
+
+  function arrayBufferToBase64(buf) {
+    let binary = "";
+    const bytes = new Uint8Array(buf);
+    const chunk = 0x8000;
+    for (let i = 0; i < bytes.length; i += chunk) {
+      binary += String.fromCharCode(...bytes.subarray(i, i + chunk));
+    }
+    return btoa(binary);
+  }
+
+  let rec = null;
+  async function startRecording() {
+    if (busy) return;
+    if (!navigator.mediaDevices?.getUserMedia) throw new Error("Mic not supported");
+    stopSpeech();
+
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const source = ctx.createMediaStreamSource(stream);
+    const processor = ctx.createScriptProcessor(2048, 1, 1);
+    const chunks = [];
+    processor.onaudioprocess = (e) => {
+      const input = e.inputBuffer.getChannelData(0);
+      chunks.push(new Float32Array(input));
+    };
+    source.connect(processor);
+    processor.connect(ctx.destination);
+
+    rec = {
+      stream,
+      ctx,
+      source,
+      processor,
+      chunks,
+      sampleRate: ctx.sampleRate,
+      startedAt: Date.now(),
+    };
+  }
+
+  async function stopRecording() {
+    if (!rec) return null;
+    const r = rec;
+    rec = null;
+    try {
+      r.processor.disconnect();
+      r.source.disconnect();
+    } catch {}
+    try {
+      r.stream.getTracks().forEach((t) => t.stop());
+    } catch {}
+    try {
+      await r.ctx.close();
+    } catch {}
+
+    // Merge float chunks
+    const total = r.chunks.reduce((sum, c) => sum + c.length, 0);
+    const merged = new Float32Array(total);
+    let off = 0;
+    for (const c of r.chunks) {
+      merged.set(c, off);
+      off += c.length;
+    }
+
+    // Trim leading/trailing silence (very small)
+    let start = 0;
+    let end = merged.length;
+    const thr = 0.01;
+    while (start < end && Math.abs(merged[start]) < thr) start++;
+    while (end > start && Math.abs(merged[end - 1]) < thr) end--;
+    const sliced = merged.slice(start, end);
+    if (sliced.length < r.sampleRate * 0.2) return null; // too short
+
+    // Clamp max length 12s
+    const maxLen = Math.floor(r.sampleRate * 12);
+    const final = sliced.length > maxLen ? sliced.slice(0, maxLen) : sliced;
+    const pcm = floatTo16BitPCM(final);
+    const wav = encodeWav(pcm, r.sampleRate);
+    return arrayBufferToBase64(wav);
+  }
+
+  async function handleVoiceQuestion() {
+    const wavBase64 = await stopRecording();
+    if (!wavBase64) {
+      showBubble(userBubble, "");
+      showBubble(botBubble, "我没听清，再说一次～");
+      speak("我没听清，再说一次～");
+      clearBubblesSoon();
+      return;
+    }
+
+    busy = true;
+    try {
+      showBubble(botBubble, "我在听…");
+      const text = (await callAsr(wavBase64)).trim();
+      showBubble(userBubble, text || "（没识别到）");
+
+      if (!text) {
+        showBubble(botBubble, "我没听清，再说一次～");
+        await speak("我没听清，再说一次～");
+        return;
+      }
+
+      showBubble(botBubble, "让我想想…");
+      const out = await callBrain(text);
+      const sayText = typeof out?.sayText === "string" ? out.sayText : "好呀～";
+      applyActions(out?.actions);
+      showBubble(botBubble, sayText);
+      await speak(sayText);
+    } catch {
+      showBubble(botBubble, "出错了～等一下再试试");
+      await speak("出错了，等一下再试试");
+    } finally {
+      busy = false;
+      clearBubblesSoon();
+    }
+  }
+
+  if (micBtn) {
+    const start = async () => {
+      if (busy) return;
+      try {
+        showBubble(userBubble, "（在听…）");
+        showBubble(botBubble, "");
+        micBtn.classList.add("recording");
+        await startRecording();
+      } catch {
+        micBtn.classList.remove("recording");
+        showBubble(botBubble, "我需要麦克风权限～");
+        speak("我需要麦克风权限");
+        clearBubblesSoon();
+      }
+    };
+
+    const stop = async () => {
+      micBtn.classList.remove("recording");
+      if (!rec) return;
+      await handleVoiceQuestion();
+    };
+
+    micBtn.addEventListener("pointerdown", (e) => {
+      micBtn.setPointerCapture?.(e.pointerId);
+      start();
+    });
+    micBtn.addEventListener("pointerup", stop);
+    micBtn.addEventListener("pointercancel", stop);
+    micBtn.addEventListener("pointerleave", stop);
+  }
 
   // Keyboard (useful on desktop)
   window.addEventListener("keydown", (e) => {

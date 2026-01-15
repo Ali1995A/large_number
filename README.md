@@ -23,6 +23,7 @@
 3. 部署后：
    - `POST /api/tts`：服务端代发 `glm-tts`（前端 `config.js` 已默认用 `server-tts`）
    - `POST /api/brain`：服务端调用 `glm-4.7` 产出 `{sayText, actions}`
+   - `POST /api/asr`：服务端调用 `glm-asr-2512`，把音频转文字
 
 注意：Vercel Serverless 通常不支持 WebSocket relay，因此 `glm-realtime` 的 WS 代理需要单独部署（例如云主机/Render/Fly/Cloudflare Workers）。Vercel 这边负责静态页面 + `/api/brain` + `/api/tts` 即可。
 
@@ -33,6 +34,7 @@
    - 左右滑动：换到更大/更小的数字
    - 点一下魔法棒：读出当前数字（中文）
    - 长按魔法棒：自动一路变大
+   - 按住麦克风说话：提问；松开后识别并回答（`/api/asr` + `/api/brain` + `/api/tts`）
    - 双指捏合：缩放糖果画面
 
 ## 数字范围

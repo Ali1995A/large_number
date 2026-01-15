@@ -346,6 +346,61 @@ body{
   position:relative;
   overflow:hidden;
 }
+.btn.mic{
+  width:140px;
+  padding: 0 12px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  gap:10px;
+  background: linear-gradient(180deg, #fff, rgba(255,255,255,.7));
+}
+.micIcon{
+  font-size:20px;
+}
+.micText{
+  font-size:16px;
+  font-weight:1000;
+}
+.btn.mic.recording{
+  background: linear-gradient(180deg, #fff2f8, rgba(255,120,170,.35));
+  box-shadow: 0 10px 24px rgba(255,90,140,.22);
+}
+.btn.mic.recording .micIcon{
+  animation: pulse 700ms ease-in-out infinite alternate;
+}
+@keyframes pulse{
+  from{ transform: scale(1); }
+  to{ transform: scale(1.18); }
+}
+
+.chat{
+  position: relative;
+  display:flex;
+  flex-direction:column;
+  gap:8px;
+  pointer-events:none;
+  margin-top: -2px;
+}
+.bubble{
+  max-width: min(560px, 96vw);
+  width: fit-content;
+  padding: 10px 12px;
+  border-radius: 18px;
+  box-shadow: var(--shadow2);
+  background: rgba(255,255,255,.8);
+  font-weight:900;
+  line-height:1.25;
+  pointer-events:none;
+}
+.bubble.user{
+  align-self:flex-end;
+  background: rgba(255,255,255,.82);
+}
+.bubble.bot{
+  align-self:flex-start;
+  background: rgba(255,255,255,.9);
+}
 .wandStick{
   position:absolute;
   left:50%;

@@ -36,7 +36,7 @@ module.exports = async function handler(req, res) {
     "你的任务：根据孩子的问题，给出一句简短回答，并产出要驱动网页的动作。",
     "请只输出严格 JSON：{ \"sayText\": string, \"actions\": Action[] }。",
     "Action 只能是：",
-    "- {\"type\":\"showLevel\",\"value\":number}  // 切换到某个数字档位（10000..1000000000000）",
+    "- {\"type\":\"showLevel\",\"value\":number}  // value 只能是以下之一：10000,100000,1000000,10000000,100000000,1000000000,10000000000,100000000000,1000000000000",
     "- {\"type\":\"sparkle\"}",
     "- {\"type\":\"setZoom\",\"value\":number} // 0.8..1.35",
     "不要输出多余字段，不要输出 Markdown。",

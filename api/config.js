@@ -7,6 +7,10 @@ module.exports = function handler(req, res) {
     JSON.stringify({
       hasKey: Boolean(process.env.BIGMODEL_API_KEY || process.env.ZHIPUAI_API_KEY),
       textModel: process.env.BIGMODEL_TEXT_MODEL || "glm-4.7",
+      asr: {
+        provider: "server-asr",
+        model: "glm-asr-2512"
+      },
       tts: {
         provider: "server-tts",
         voice: process.env.BIGMODEL_TTS_VOICE || "tongtong",
