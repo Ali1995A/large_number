@@ -1,5 +1,24 @@
 /* global speechSynthesis */
 (function () {
+  const PERF = (() => {
+    const ua = navigator.userAgent || "";
+    const isIOS = /\b(iPad|iPhone|iPod)\b/i.test(ua);
+    const isWeChat = /\bMicroMessenger\b/i.test(ua);
+    const isSafari = isIOS && /\bSafari\b/i.test(ua) && !/\bCriOS\b/i.test(ua);
+    // Older iPad Pro / WebViews can struggle with frequent DOM rebuilds.
+    const lowPower = isIOS || isWeChat;
+    return {
+      lowPower,
+      candyBase: lowPower ? 34 : 52,
+      candyExtraCap: lowPower ? 54 : 92,
+      sparkleCount: lowPower ? 10 : 18,
+      maxRecordSeconds: lowPower ? 7 : 10,
+      targetSampleRate: 16000,
+      isSafari,
+      isWeChat,
+    };
+  })();
+
   const LEVELS = [
     {
       value: 10,
@@ -150,6 +169,7 @@
   const pointers = new Map();
   let pinchStartDistance = null;
   let pinchStartZoom = 1;
+  let worldSize = { width: 0, height: 0 };
 
   function formatArabic(n) {
     return n.toLocaleString("en-US");
@@ -307,7 +327,7 @@
 
   function sparkle() {
     const rect = world.getBoundingClientRect();
-    const count = 18;
+    const count = PERF.sparkleCount;
     for (let i = 0; i < count; i++) {
       const s = document.createElement("div");
       s.style.position = "absolute";
@@ -346,12 +366,12 @@
 
   function renderCandyField(seed) {
     candyField.innerHTML = "";
-    let rect = world.getBoundingClientRect();
-    if (rect.width < 50 || rect.height < 50) {
-      rect = { width: Math.max(320, window.innerWidth), height: Math.max(420, window.innerHeight * 0.55) };
-    }
-    const base = 52;
-    const extra = Math.min(92, Math.floor(Math.log10(seed) * 16));
+    const rect =
+      worldSize.width > 50 && worldSize.height > 50
+        ? worldSize
+        : { width: Math.max(320, window.innerWidth), height: Math.max(420, window.innerHeight * 0.55) };
+    const base = PERF.candyBase;
+    const extra = Math.min(PERF.candyExtraCap, Math.floor(Math.log10(seed) * 14));
     const count = base + extra;
 
     for (let i = 0; i < count; i++) {
@@ -544,6 +564,13 @@
     containerRow.style.transform = `scale(${clamp(zoom * 0.96, 0.85, 1.18)})`;
   }
 
+  function updateWorldSize() {
+    try {
+      const rect = world.getBoundingClientRect();
+      worldSize = { width: rect.width, height: rect.height };
+    } catch {}
+  }
+
   function prev() {
     hideHintOnce();
     customMode = false;
@@ -684,6 +711,16 @@
   world.addEventListener("pointermove", onPointerMove);
   world.addEventListener("pointerup", onPointerUp);
   world.addEventListener("pointercancel", onPointerUp);
+
+  // Keep layout info without forcing it on every render
+  if ("ResizeObserver" in window) {
+    try {
+      new ResizeObserver(() => updateWorldSize()).observe(world);
+    } catch {}
+  } else {
+    window.addEventListener("resize", updateWorldSize, { passive: true });
+  }
+  updateWorldSize();
 
   function showBubble(el, text) {
     if (!el) return;
@@ -902,14 +939,44 @@
     return buffer;
   }
 
-  function arrayBufferToBase64(buf) {
-    let binary = "";
-    const bytes = new Uint8Array(buf);
-    const chunk = 0x8000;
-    for (let i = 0; i < bytes.length; i += chunk) {
-      binary += String.fromCharCode(...bytes.subarray(i, i + chunk));
+  function arrayBufferToBase64Async(buf) {
+    return new Promise((resolve, reject) => {
+      try {
+        const blob = new Blob([buf], { type: "audio/wav" });
+        const fr = new FileReader();
+        fr.onload = () => {
+          const s = String(fr.result || "");
+          const idx = s.indexOf(",");
+          resolve(idx >= 0 ? s.slice(idx + 1) : "");
+        };
+        fr.onerror = () => reject(fr.error || new Error("FileReader error"));
+        fr.readAsDataURL(blob);
+      } catch (e) {
+        reject(e);
+      }
+    });
+  }
+
+  function downsampleBuffer(buffer, inSampleRate, outSampleRate) {
+    if (outSampleRate >= inSampleRate) return buffer;
+    const ratio = inSampleRate / outSampleRate;
+    const outLength = Math.max(1, Math.round(buffer.length / ratio));
+    const out = new Float32Array(outLength);
+    let offsetResult = 0;
+    let offsetBuffer = 0;
+    while (offsetResult < outLength) {
+      const nextOffsetBuffer = Math.round((offsetResult + 1) * ratio);
+      let acc = 0;
+      let count = 0;
+      for (let i = offsetBuffer; i < nextOffsetBuffer && i < buffer.length; i++) {
+        acc += buffer[i];
+        count++;
+      }
+      out[offsetResult] = count ? acc / count : 0;
+      offsetResult++;
+      offsetBuffer = nextOffsetBuffer;
     }
-    return btoa(binary);
+    return out;
   }
 
   let rec = null;
@@ -918,23 +985,28 @@
     if (!navigator.mediaDevices?.getUserMedia) throw new Error("Mic not supported");
     stopSpeech();
 
-    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    const streamPromise = navigator.mediaDevices.getUserMedia({ audio: true });
+    const stream = await streamPromise;
     const ctx = new (window.AudioContext || window.webkitAudioContext)();
     const source = ctx.createMediaStreamSource(stream);
     const processor = ctx.createScriptProcessor(2048, 1, 1);
+    const silent = ctx.createGain();
+    silent.gain.value = 0;
     const chunks = [];
     processor.onaudioprocess = (e) => {
       const input = e.inputBuffer.getChannelData(0);
       chunks.push(new Float32Array(input));
     };
     source.connect(processor);
-    processor.connect(ctx.destination);
+    processor.connect(silent);
+    silent.connect(ctx.destination);
 
     rec = {
       stream,
       ctx,
       source,
       processor,
+      silent,
       chunks,
       sampleRate: ctx.sampleRate,
       startedAt: Date.now(),
@@ -948,6 +1020,7 @@
     try {
       r.processor.disconnect();
       r.source.disconnect();
+      r.silent?.disconnect?.();
     } catch {}
     try {
       r.stream.getTracks().forEach((t) => t.stop());
@@ -974,12 +1047,15 @@
     const sliced = merged.slice(start, end);
     if (sliced.length < r.sampleRate * 0.2) return null; // too short
 
-    // Clamp max length 12s
-    const maxLen = Math.floor(r.sampleRate * 12);
+    // Clamp max length for older devices to avoid freezes
+    const maxLen = Math.floor(r.sampleRate * PERF.maxRecordSeconds);
     const final = sliced.length > maxLen ? sliced.slice(0, maxLen) : sliced;
-    const pcm = floatTo16BitPCM(final);
-    const wav = encodeWav(pcm, r.sampleRate);
-    return arrayBufferToBase64(wav);
+    // Yield once before heavy processing (helps iOS WebView)
+    await new Promise((r) => requestAnimationFrame(() => r()));
+    const ds = downsampleBuffer(final, r.sampleRate, PERF.targetSampleRate);
+    const pcm = floatTo16BitPCM(ds);
+    const wav = encodeWav(pcm, PERF.targetSampleRate);
+    return await arrayBufferToBase64Async(wav);
   }
 
   async function handleVoiceQuestion() {
@@ -1044,7 +1120,12 @@
         showBubble(userBubble, "（在听…）");
         showBubble(botBubble, "");
         micBtn.classList.add("recording");
+        // If the permission prompt is showing, keep the UI responsive.
+        const promptTimer = setTimeout(() => {
+          if (!rec) showBubble(botBubble, "请点“允许麦克风”～");
+        }, 900);
         await startRecording();
+        clearTimeout(promptTimer);
       } catch {
         micBtn.classList.remove("recording");
         showBubble(botBubble, "我需要麦克风权限～");

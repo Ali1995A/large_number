@@ -24,6 +24,7 @@ body{
     radial-gradient(900px 900px at 90% 30%, #e9f8ff 0%, transparent 55%),
     linear-gradient(160deg, var(--bg1), var(--bg2));
   overflow:hidden;
+  -webkit-text-size-adjust: 100%;
 }
 
 .app{
@@ -359,6 +360,7 @@ body{
   align-items:center;
   justify-content:center;
   gap:10px;
+  -webkit-tap-highlight-color: transparent;
 }
 .btn:active{
   transform: translateY(1px) scale(.99);
