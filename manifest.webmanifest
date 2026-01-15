@@ -1,0 +1,17 @@
+{
+  "name": "糖果公主：最大的数字",
+  "short_name": "最大的数字",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#ffe1f0",
+  "theme_color": "#ff7ab6",
+  "icons": [
+    {
+      "src": "icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
+

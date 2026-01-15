@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
+  <defs>
+    <linearGradient id="g" x1="0" x2="0" y1="0" y2="1">
+      <stop offset="0" stop-color="#fff2b0"/>
+      <stop offset="1" stop-color="#ffd566"/>
+    </linearGradient>
+    <linearGradient id="p" x1="0" x2="0" y1="0" y2="1">
+      <stop offset="0" stop-color="#ff93c4"/>
+      <stop offset="1" stop-color="#ff5ea8"/>
+    </linearGradient>
+  </defs>
+  <rect width="128" height="128" rx="28" fill="#ffe1f0"/>
+  <circle cx="64" cy="70" r="34" fill="#ffffff" opacity="0.75"/>
+  <path d="M30 52 L30 34 L44 44 L54 22 L64 44 L74 22 L84 44 L98 34 L98 52 Z" fill="url(#g)" />
+  <rect x="34" y="52" width="60" height="10" rx="5" fill="#ffb84a" opacity="0.9"/>
+  <path d="M44 98 C54 86, 74 86, 84 98" fill="none" stroke="url(#p)" stroke-width="8" stroke-linecap="round"/>
+  <text x="64" y="78" font-family="system-ui, -apple-system, PingFang SC, sans-serif" font-size="28" text-anchor="middle" font-weight="900" fill="#522b4e">万亿</text>
+</svg>
+
