@@ -192,6 +192,18 @@ body{
   font-size: 20px;
   opacity:.9;
 }
+.eqLine{
+  margin-top:8px;
+  font-weight:1000;
+  font-size:18px;
+  padding: 8px 10px;
+  border-radius: 16px;
+  background: rgba(255,255,255,.72);
+  box-shadow: 0 10px 20px rgba(40,18,40,.10);
+  width: fit-content;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
 
 .world{
   position:relative;

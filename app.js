@@ -79,6 +79,7 @@
   const chat = $("chat");
   const userBubble = $("userBubble");
   const botBubble = $("botBubble");
+  const eqLine = $("eqLine");
   const prevBtn = $("prevBtn");
   const nextBtn = $("nextBtn");
   const wandBtn = $("wandBtn");
@@ -86,6 +87,9 @@
   const soundIcon = $("soundIcon");
 
   let levelIndex = 0;
+  let currentValue = LEVELS[0].value;
+  let customMode = false;
+  let customEquation = "";
   let muted = false;
   let zoom = 1;
   let audioEl = null;
@@ -367,17 +371,85 @@
     return `rgba(${r},${g},${b},${a})`;
   }
 
+  function getUnitForValue(v) {
+    if (v >= 1_000_000_000_000) return "万亿";
+    if (v >= 100_000_000) return "亿";
+    if (v >= 10_000) return "万";
+    return "";
+  }
+
+  function numberToChinese(n) {
+    if (!Number.isFinite(n)) return "";
+    if (n === 0) return "零";
+    if (n < 0) return `负${numberToChinese(-n)}`;
+    if (!Number.isInteger(n)) {
+      // keep 2 decimals for simple divisions
+      const s = n.toFixed(2).replace(/\.?0+$/, "");
+      const [i, f] = s.split(".");
+      if (!f) return numberToChinese(Number(i));
+      const digit = ["零", "一", "二", "三", "四", "五", "六", "七", "八", "九"];
+      return `${numberToChinese(Number(i))}点${f.split("").map((c) => digit[Number(c)]).join("")}`;
+    }
+
+    const digit = ["零", "一", "二", "三", "四", "五", "六", "七", "八", "九"];
+    const smallUnit = ["", "十", "百", "千"];
+    const bigUnit = ["", "万", "亿", "万亿"];
+
+    const parts = [];
+    let x = n;
+    let big = 0;
+    while (x > 0 && big < bigUnit.length) {
+      const chunk = x % 10000;
+      if (chunk !== 0) {
+        let s = "";
+        let zero = false;
+        for (let i = 0; i < 4; i++) {
+          const d = Math.floor(chunk / Math.pow(10, i)) % 10;
+          if (d === 0) {
+            if (s && !zero) zero = true;
+          } else {
+            const prefix = zero ? "零" : "";
+            zero = false;
+            s = `${digit[d]}${smallUnit[i]}${prefix}${s}`.replace(/零+$/, "");
+          }
+        }
+        s = s.replace(/^一十/, "十");
+        parts.unshift(`${s}${bigUnit[big]}`);
+      } else if (parts.length > 0 && !parts[0].startsWith("零")) {
+        parts.unshift("零");
+      }
+      x = Math.floor(x / 10000);
+      big++;
+    }
+    return parts.join("").replace(/零+/g, "零").replace(/零$/, "");
+  }
+
+  function setEquation(text) {
+    customEquation = text || "";
+    if (!eqLine) return;
+    eqLine.hidden = !customEquation;
+    eqLine.textContent = customEquation;
+  }
+
   function updateUI({ speakNow = false } = {}) {
-    const L = LEVELS[levelIndex];
-    arabicNumber.textContent = formatArabic(L.value);
-    cnNumber.textContent = L.cn;
-    unitText.textContent = L.unit;
-    if (unitBadge) unitBadge.classList.toggle("long", L.unit.length > 1);
-    renderContainers(L.container.label, L.container.emoji);
-    renderCandyField(L.value);
-    setTheme(L.theme);
+    const base = customMode ? null : LEVELS[levelIndex];
+    const value = customMode ? currentValue : base.value;
+    const cn = customMode ? numberToChinese(value) : base.cn;
+    const unit = customMode ? getUnitForValue(value) || base.unit : base.unit;
+    arabicNumber.textContent = formatArabic(value);
+    cnNumber.textContent = cn;
+    unitText.textContent = unit;
+    if (unitBadge) unitBadge.classList.toggle("long", unit.length > 1);
+    if (base) {
+      renderContainers(base.container.label, base.container.emoji);
+      setTheme(base.theme);
+    } else {
+      renderContainers("礼盒", "🎁");
+      setTheme({ bgA: "#ff7ab6", bgB: "#7ddcff" });
+    }
+    renderCandyField(value);
     sparkle();
-    if (speakNow) speak(`${L.cn}颗糖`);
+    if (speakNow) speak(`${cn}颗糖`);
   }
 
   function setLevelByValue(value) {
@@ -396,6 +468,9 @@
       idx = best;
     }
     levelIndex = idx;
+    currentValue = LEVELS[levelIndex].value;
+    customMode = false;
+    setEquation("");
     updateUI({ speakNow: false });
     return true;
   }
@@ -411,13 +486,19 @@
 
   function prev() {
     hideHintOnce();
+    customMode = false;
+    setEquation("");
     levelIndex = (levelIndex - 1 + LEVELS.length) % LEVELS.length;
+    currentValue = LEVELS[levelIndex].value;
     updateUI({ speakNow: true });
   }
 
   function next() {
     hideHintOnce();
+    customMode = false;
+    setEquation("");
     levelIndex = (levelIndex + 1) % LEVELS.length;
+    currentValue = LEVELS[levelIndex].value;
     updateUI({ speakNow: true });
   }
 
@@ -426,7 +507,8 @@
     muted = !muted;
     soundIcon.textContent = muted ? "🔇" : "🔊";
     if (muted) stopSpeech();
-    if (!muted) speak(`${LEVELS[levelIndex].cn}颗糖`);
+    const cn = customMode ? numberToChinese(currentValue) : LEVELS[levelIndex].cn;
+    if (!muted) speak(`${cn}颗糖`);
   }
 
   prevBtn.addEventListener("click", prev);
@@ -436,7 +518,8 @@
   wandBtn.addEventListener("click", () => {
     hideHintOnce();
     sparkle();
-    speak(`${LEVELS[levelIndex].cn}颗糖`);
+    const cn = customMode ? numberToChinese(currentValue) : LEVELS[levelIndex].cn;
+    speak(`${cn}颗糖`);
   });
 
   let holdTimer = null;
@@ -553,6 +636,106 @@
       if (userBubble) userBubble.hidden = true;
       if (botBubble) botBubble.hidden = true;
     }, 8000);
+  }
+
+  function parseChineseInt(s) {
+    // Supports up to 万亿, and simple forms like 一万零一百/十亿/一千亿
+    const digit = new Map([
+      ["零", 0],
+      ["一", 1],
+      ["二", 2],
+      ["两", 2],
+      ["三", 3],
+      ["四", 4],
+      ["五", 5],
+      ["六", 6],
+      ["七", 7],
+      ["八", 8],
+      ["九", 9],
+    ]);
+    const unit = new Map([
+      ["十", 10],
+      ["百", 100],
+      ["千", 1000],
+      ["万", 10000],
+      ["亿", 100000000],
+      ["兆", 1000000000000],
+    ]);
+
+    let total = 0;
+    let section = 0;
+    let number = 0;
+    for (const ch of s) {
+      if (digit.has(ch)) {
+        number = digit.get(ch);
+        continue;
+      }
+      if (unit.has(ch)) {
+        const u = unit.get(ch);
+        if (u < 10000) {
+          section += (number || 1) * u;
+        } else {
+          section += number;
+          total += section * u;
+          section = 0;
+        }
+        number = 0;
+      }
+    }
+    return total + section + number;
+  }
+
+  function extractNumbers(text) {
+    const nums = [];
+    const re = /\d+(?:\.\d+)?/g;
+    let m;
+    while ((m = re.exec(text))) nums.push(Number(m[0]));
+
+    if (nums.length) return nums;
+
+    // Try simple chinese numerals if no arabic digits
+    const chunkRe = /[零一二两三四五六七八九十百千万亿兆]+/g;
+    while ((m = chunkRe.exec(text))) {
+      const v = parseChineseInt(m[0]);
+      if (Number.isFinite(v) && v !== 0) nums.push(v);
+    }
+    return nums;
+  }
+
+  function detectOp(text) {
+    if (/[+＋]|加/.test(text)) return "+";
+    if (/[-－]|减/.test(text)) return "-";
+    if (/[x×*]|乘/.test(text)) return "*";
+    if (/[\/÷]|除/.test(text)) return "/";
+    return null;
+  }
+
+  function tryLocalMath(transcript) {
+    const op = detectOp(transcript);
+    if (!op) return null;
+    const nums = extractNumbers(transcript);
+    if (nums.length === 0) return null;
+    let a;
+    let b;
+    if (nums.length >= 2) {
+      [a, b] = nums;
+    } else {
+      a = currentValue;
+      b = nums[0];
+    }
+    if (!Number.isFinite(a) || !Number.isFinite(b)) return null;
+
+    let result;
+    if (op === "+") result = a + b;
+    else if (op === "-") result = a - b;
+    else if (op === "*") result = a * b;
+    else if (op === "/") {
+      if (b === 0) return { error: "不能除以零" };
+      result = a / b;
+    } else return null;
+
+    const eq = `${formatArabic(a)} ${op} ${formatArabic(b)} = ${formatArabic(result)}`;
+    return { a, b, op, result, eq };
   }
 
   async function callAsr(wavBase64) {
@@ -754,6 +937,24 @@
       if (!text) {
         showBubble(botBubble, "我没听清，再说一次～");
         await speak("我没听清，再说一次～");
+        return;
+      }
+
+      const math = tryLocalMath(text);
+      if (math?.error) {
+        showBubble(botBubble, math.error);
+        setEquation("");
+        await speak(math.error);
+        return;
+      }
+      if (math && Number.isFinite(math.result)) {
+        customMode = true;
+        currentValue = math.result;
+        setEquation(math.eq);
+        updateUI({ speakNow: false });
+        showBubble(botBubble, `${formatArabic(math.result)}`);
+        await speak(`${math.result}`);
+        sparkle();
         return;
       }
 
