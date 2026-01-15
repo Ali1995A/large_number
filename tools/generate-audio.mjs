@@ -2,6 +2,9 @@ import { mkdir, writeFile } from "node:fs/promises";
 import { resolve } from "node:path";
 
 const LEVELS = [
+  { value: 10, cn: "十" },
+  { value: 100, cn: "一百" },
+  { value: 1_000, cn: "一千" },
   { value: 10_000, cn: "一万" },
   { value: 100_000, cn: "十万" },
   { value: 1_000_000, cn: "一百万" },
@@ -11,6 +14,10 @@ const LEVELS = [
   { value: 10_000_000_000, cn: "一百亿" },
   { value: 100_000_000_000, cn: "一千亿" },
   { value: 1_000_000_000_000, cn: "一万亿" },
+  { value: 10_000_000_000_000, cn: "十万亿" },
+  { value: 100_000_000_000_000, cn: "一百万亿" },
+  { value: 1_000_000_000_000_000, cn: "一千万亿" },
+  { value: 10_000_000_000_000_000, cn: "一亿亿" },
 ];
 
 function arg(name) {

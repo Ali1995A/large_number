@@ -2,11 +2,32 @@
 (function () {
   const LEVELS = [
     {
+      value: 10,
+      unit: "",
+      cn: "十",
+      container: { label: "颗", emoji: "🍬" },
+      theme: { bgA: "#ff7ab6", bgB: "#7ddcff" },
+    },
+    {
+      value: 100,
+      unit: "",
+      cn: "一百",
+      container: { label: "颗", emoji: "🍬" },
+      theme: { bgA: "#ff6aa8", bgB: "#9be7ff" },
+    },
+    {
+      value: 1_000,
+      unit: "",
+      cn: "一千",
+      container: { label: "颗", emoji: "🍬" },
+      theme: { bgA: "#ff5ea8", bgB: "#b1f0ff" },
+    },
+    {
       value: 10_000,
       unit: "万",
       cn: "一万",
       container: { label: "小袋", emoji: "🢋" },
-      theme: { bgA: "#ff7ab6", bgB: "#7ddcff" },
+      theme: { bgA: "#ff66b6", bgB: "#6fdcff" },
     },
     {
       value: 100_000,
@@ -63,6 +84,34 @@
       cn: "一万亿",
       container: { label: "星海", emoji: "✨" },
       theme: { bgA: "#b794ff", bgB: "#7ddcff" },
+    },
+    {
+      value: 10_000_000_000_000,
+      unit: "万亿",
+      cn: "十万亿",
+      container: { label: "星河", emoji: "🌌" },
+      theme: { bgA: "#7ddcff", bgB: "#b794ff" },
+    },
+    {
+      value: 100_000_000_000_000,
+      unit: "万亿",
+      cn: "一百万亿",
+      container: { label: "星系", emoji: "🪐" },
+      theme: { bgA: "#ffd566", bgB: "#b794ff" },
+    },
+    {
+      value: 1_000_000_000_000_000,
+      unit: "万亿",
+      cn: "一千万亿",
+      container: { label: "宇宙", emoji: "🌠" },
+      theme: { bgA: "#ff93c4", bgB: "#b794ff" },
+    },
+    {
+      value: 10_000_000_000_000_000,
+      unit: "亿亿",
+      cn: "一亿亿",
+      container: { label: "无限", emoji: "♾️" },
+      theme: { bgA: "#b794ff", bgB: "#ff5ea8" },
     },
   ];
 
@@ -378,6 +427,7 @@
   }
 
   function getUnitForValue(v) {
+    if (v >= 10_000_000_000_000_000) return "亿亿";
     if (v >= 1_000_000_000_000) return "万亿";
     if (v >= 100_000_000) return "亿";
     if (v >= 10_000) return "万";
@@ -399,7 +449,7 @@
 
     const digit = ["零", "一", "二", "三", "四", "五", "六", "七", "八", "九"];
     const smallUnit = ["", "十", "百", "千"];
-    const bigUnit = ["", "万", "亿", "万亿"];
+    const bigUnit = ["", "万", "亿", "万亿", "亿亿"];
 
     const parts = [];
     let x = n;
@@ -652,6 +702,7 @@
 
   function parseChineseInt(s) {
     // Supports up to 万亿, and simple forms like 一万零一百/十亿/一千亿
+    s = s.replaceAll("万亿", "兆").replaceAll("亿亿", "京");
     const digit = new Map([
       ["零", 0],
       ["一", 1],
@@ -672,6 +723,7 @@
       ["万", 10000],
       ["亿", 100000000],
       ["兆", 1000000000000],
+      ["京", 10000000000000000],
     ]);
 
     let total = 0;
