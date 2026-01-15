@@ -90,6 +90,7 @@
   let currentValue = LEVELS[0].value;
   let customMode = false;
   let customEquation = "";
+  let selectedMult = 1;
   let muted = false;
   let zoom = 1;
   let audioEl = null;
@@ -330,11 +331,16 @@
     applyZoom();
   }
 
-  function renderContainers(label, emoji) {
+  function renderContainers(label, emoji, { baseValue, activeMult } = {}) {
     containerRow.innerHTML = "";
     for (let i = 0; i < 10; i++) {
       const box = document.createElement("div");
       box.className = "unitContainer";
+      box.dataset.mult = String(i + 1);
+      if (Number.isFinite(baseValue)) box.dataset.base = String(baseValue);
+      if (activeMult === i + 1) box.classList.add("active");
+      box.setAttribute("role", "button");
+      box.tabIndex = 0;
 
       const icon = document.createElement("div");
       icon.className = "unitIcon";
@@ -345,7 +351,7 @@
 
       const lab = document.createElement("div");
       lab.className = "unitLabel";
-      lab.textContent = label;
+      lab.textContent = `${i + 1}${label}`;
 
       box.appendChild(icon);
       box.appendChild(lab);
@@ -441,10 +447,13 @@
     unitText.textContent = unit;
     if (unitBadge) unitBadge.classList.toggle("long", unit.length > 1);
     if (base) {
-      renderContainers(base.container.label, base.container.emoji);
+      renderContainers(base.container.label, base.container.emoji, {
+        baseValue: base.value,
+        activeMult: selectedMult,
+      });
       setTheme(base.theme);
     } else {
-      renderContainers("礼盒", "🎁");
+      renderContainers("礼盒", "🎁", { baseValue: LEVELS[levelIndex].value, activeMult: selectedMult });
       setTheme({ bgA: "#ff7ab6", bgB: "#7ddcff" });
     }
     renderCandyField(value);
@@ -470,6 +479,7 @@
     levelIndex = idx;
     currentValue = LEVELS[levelIndex].value;
     customMode = false;
+    selectedMult = 1;
     setEquation("");
     updateUI({ speakNow: false });
     return true;
@@ -487,6 +497,7 @@
   function prev() {
     hideHintOnce();
     customMode = false;
+    selectedMult = 1;
     setEquation("");
     levelIndex = (levelIndex - 1 + LEVELS.length) % LEVELS.length;
     currentValue = LEVELS[levelIndex].value;
@@ -496,6 +507,7 @@
   function next() {
     hideHintOnce();
     customMode = false;
+    selectedMult = 1;
     setEquation("");
     levelIndex = (levelIndex + 1) % LEVELS.length;
     currentValue = LEVELS[levelIndex].value;
@@ -1002,6 +1014,41 @@
     micBtn.addEventListener("pointerup", stop);
     micBtn.addEventListener("pointercancel", stop);
     micBtn.addEventListener("pointerleave", stop);
+  }
+
+  function handleContainerActivate(target) {
+    const box = target?.closest?.(".unitContainer");
+    if (!box) return;
+    const mult = Number(box.dataset.mult);
+    const baseValue = Number(box.dataset.base || LEVELS[levelIndex].value);
+    if (!Number.isFinite(mult) || mult < 1 || mult > 10) return;
+    if (!Number.isFinite(baseValue) || baseValue <= 0) return;
+
+    hideHintOnce();
+    selectedMult = mult;
+    if (mult === 1) {
+      customMode = false;
+      currentValue = baseValue;
+      setEquation("");
+      updateUI({ speakNow: true });
+      return;
+    }
+
+    customMode = true;
+    currentValue = baseValue * mult;
+    setEquation(`${mult} × ${formatArabic(baseValue)} = ${formatArabic(currentValue)}`);
+    updateUI({ speakNow: false });
+    sparkle();
+    speak(`${numberToChinese(currentValue)}颗糖`);
+  }
+
+  if (containerRow) {
+    containerRow.addEventListener("click", (e) => handleContainerActivate(e.target));
+    containerRow.addEventListener("keydown", (e) => {
+      if (e.key !== "Enter" && e.key !== " ") return;
+      e.preventDefault();
+      handleContainerActivate(e.target);
+    });
   }
 
   // Keyboard (useful on desktop)
