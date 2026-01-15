@@ -5,7 +5,7 @@ async function readJson(req) {
   return JSON.parse(raw || "{}");
 }
 
-export default async function handler(req, res) {
+module.exports = async function handler(req, res) {
   if (req.method !== "POST") {
     res.statusCode = 405;
     res.setHeader("Allow", "POST");
@@ -87,5 +87,4 @@ export default async function handler(req, res) {
     res.statusCode = 200;
     return res.end(JSON.stringify({ sayText: content, actions: [{ type: "sparkle" }] }));
   }
-}
-
+};

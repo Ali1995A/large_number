@@ -1,7 +1,6 @@
 {
   "name": "candy-princess-big-number",
   "private": true,
-  "type": "module",
   "scripts": {
     "dev": "node server.mjs",
     "generate-audio": "node tools/generate-audio.mjs"
@@ -11,4 +10,3 @@
     "ws": "^8.18.0"
   }
 }
-

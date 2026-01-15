@@ -13,9 +13,13 @@
 ## 部署到 Vercel
 
 1. 直接把仓库导入 Vercel
-2. 在 Vercel 项目环境变量里配置（和 `.env.example` 同名）：
+2. 在 Vercel 项目环境变量里配置（建议三套都配：Development/Preview/Production）：
    - `BIGMODEL_API_KEY`（必填）
-   - 可选：`BIGMODEL_TEXT_MODEL=glm-4.7`、`BIGMODEL_TTS_VOICE=tongtong` 等
+   - `BIGMODEL_BASE_URL`（可选，默认 `https://open.bigmodel.cn`）
+   - `BIGMODEL_TEXT_MODEL`（可选，默认 `glm-4.7`）
+   - `BIGMODEL_TTS_VOICE`（可选，默认 `tongtong`）
+   - `BIGMODEL_TTS_SPEED`（可选，默认 `1.0`）
+   - `BIGMODEL_TTS_VOLUME`（可选，默认 `1.0`）
 3. 部署后：
    - `POST /api/tts`：服务端代发 `glm-tts`（前端 `config.js` 已默认用 `server-tts`）
    - `POST /api/brain`：服务端调用 `glm-4.7` 产出 `{sayText, actions}`
