@@ -1,4 +1,4 @@
-const CACHE = "candy-princess-big-number-v4";
+const CACHE = "candy-princess-big-number-v5";
 const ASSETS = ["./", "./index.html", "./styles.css", "./app.js", "./manifest.webmanifest", "./icon.svg"];
 
 self.addEventListener("install", (event) => {

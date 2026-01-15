@@ -342,6 +342,7 @@ body{
   gap:10px;
   align-items:stretch;
   user-select:none;
+  -webkit-user-select:none;
 }
 .btn{
   appearance:none;
@@ -361,6 +362,14 @@ body{
   justify-content:center;
   gap:10px;
   -webkit-tap-highlight-color: transparent;
+  user-select:none;
+  -webkit-user-select:none;
+  -webkit-touch-callout:none;
+}
+.btn *{
+  user-select:none;
+  -webkit-user-select:none;
+  -webkit-touch-callout:none;
 }
 .btn:active{
   transform: translateY(1px) scale(.99);

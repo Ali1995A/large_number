@@ -1142,11 +1142,14 @@
 
     micBtn.addEventListener("pointerdown", (e) => {
       micBtn.setPointerCapture?.(e.pointerId);
+      // Avoid text selection on iOS/WeChat while holding.
+      e.preventDefault?.();
       start();
     });
     micBtn.addEventListener("pointerup", stop);
     micBtn.addEventListener("pointercancel", stop);
     micBtn.addEventListener("pointerleave", stop);
+    micBtn.addEventListener("selectstart", (e) => e.preventDefault());
   }
 
   function handleContainerActivate(target) {
